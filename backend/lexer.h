@@ -3,22 +3,24 @@
 #include "../common.h"
 
 /* Token information. */
-typedef enum {
+typedef enum { // `kw` = keyword
     COMMENT = 0x1, // `//`
     LEFT_SB, RIGHT_SB, // `[` `]`
     LEFT_CB, RIGHT_CB, // `{`, `}`
+    LEFT_P, RIGHT_P, // `(`, `)`
     AT_SYMBOL, // `@`
     BASE_URL, // `base`
     USER_DEFINED,
     INCOMING_REQUEST_TYPE, OUTGOING_REQUEST_TYPE, // `incoming`, `outgoing`
     /* Useable with HEADER and BODY of a HTTP request. */
-    EXPECTED, OKAY, REJECT, // `expected`, `okay`, `reject`
     COLON, // `:`
     COMMA, // `,`
     EQUAL, // `=`
     DOUBLE_QUOTE, SINGLE_QUOTE, // `"`, `'`
     NUMBER_VALUE, STRING_VALUE,
-    POST, GET,
+    POST_KW, GET_KW, HEADERS_KW, ENDPOINT_KW,
+    EXPECTED_KW, OKAY_KW, REJECT_KW, // `expected`, `okay`, `reject`
+    PRINT_KW,
     END_OF_FILE
 } NovaTokens;
 
@@ -43,6 +45,7 @@ typedef struct {
 
     /* Token information. */
     NovaToken token;
+    NovaToken last_token;
 } NovaLexer;
 
 NovaLexer *init_lexer(const char *filename);

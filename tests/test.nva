@@ -1,9 +1,24 @@
-// This is a test
+// This is a test file to test Nova Language and it's ability to
+// perform tasks.
+// Created: 09/06/2025, by Aidan White.
 
-@a_variable="yes"
-@a_variable=126
+@a_variable="\nyes\n\n"
 
-// LOL
-// LOL
-// LOL
-/ test error comment
+endpoint("/test") {
+    headers {
+        [expected]
+        {
+
+        }
+
+        [okay]
+        {
+
+        }
+
+        [reject]
+        {
+
+        }
+    }
+}
