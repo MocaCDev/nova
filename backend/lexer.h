@@ -20,6 +20,7 @@ typedef enum { // `kw` = keyword
     NUMBER_VALUE, STRING_VALUE,
     POST_KW, GET_KW, HEADERS_KW, ENDPOINT_KW,
     EXPECTED_KW, OKAY_KW, REJECT_KW, // `expected`, `okay`, `reject`
+    VARIABLE_KW, // `variable`,
     PRINT_KW,
     END_OF_FILE
 } NovaTokens;

@@ -404,6 +404,7 @@ void get_token(NovaLexer *lexer) {
         att(lexer, (uint8_t *)"expected", EXPECTED_KW)
         att(lexer, (uint8_t *)"okay", OKAY_KW)
         att(lexer, (uint8_t *)"reject", REJECT_KW)
+        att(lexer, (uint8_t *)"variable", VARIABLE_KW)
 
         /* If we get here, something went wrong. */
         fprintf(stderr, "Unknown keyword: %s", lexer->token.token_value);
@@ -422,6 +423,12 @@ void get_token(NovaLexer *lexer) {
         case '=': {
             lexer->last_token = lexer->token;
             tokenize_character(lexer, EQUAL);
+            advance_lexer(lexer);
+            return;
+        }
+        case ':': {
+            lexer->last_token = lexer->token;
+            tokenize_character(lexer, COLON);
             advance_lexer(lexer);
             return;
         }

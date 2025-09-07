@@ -3,7 +3,7 @@
 .PHONY: clean
 
 build:
-	gcc -fsanitize=address main.c backend/lexer.c backend/parser.c backend/ast.c -o bin/main.o
+	gcc -fsanitize=address main.c backend/lexer.c backend/parser.c backend/ast.c backend/endpoints.c -o bin/main.o
 
 run: build
 	./bin/main.o
