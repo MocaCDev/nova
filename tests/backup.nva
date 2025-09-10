@@ -1,9 +1,46 @@
-[okay]
+endpoint("/test") {
+    headers {
+        [expected]
         {
+            "test": "test"
+            "test2": "test2"
+        }
 
+        [okay]
+        {
+            "test": "test"
+            "test2": "test2"
         }
 
         [reject]
         {
-
+            "test": "test"
+            "test2": "test2"
         }
+    }
+}
+
+endpoint("/test2") {
+    headers {
+        [expected]
+        {
+            "test": "test"
+            "test2": "test2"
+            "test3": variable
+        }
+
+        [okay]
+        {
+            "test": "test"
+            "test2": "test2"
+            "test3": variable
+        }
+
+        [reject]
+        {
+            "test": "test"
+            "test2": "test2"
+            "test3": variable
+        }
+    }
+}

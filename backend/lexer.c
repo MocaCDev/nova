@@ -158,7 +158,7 @@ void get_number(NovaLexer *lexer) {
     lexer->token.token_value[index] = '\0';
 }
 
-void get_keyword(NovaLexer *lexer) {
+void get_keyword(NovaLexer *lexer, bool allow_eof) {
     lexer->token.token_value = calloc(1, sizeof(*lexer->token.token_value));
     size_t index = 0;
 
@@ -172,15 +172,19 @@ void get_keyword(NovaLexer *lexer) {
         );
         advance_lexer(lexer);
 
-        nova_assert(
-            lexer->current_char == '\0',
-            "\e[1;31mUnexpected EOF, \e[4;31mline %d.\e[0m\n",
-            {
-                free(lexer->token.token_value);
-                free(lexer);
-            },
-            lexer->line
-        )
+        if(!allow_eof) {
+            nova_assert(
+                lexer->current_char == '\0',
+                "\e[1;31mUnexpected EOF, \e[4;31mline %d.\e[0m\n",
+                {
+                    free(lexer->token.token_value);
+                    free(lexer);
+                },
+                lexer->line
+            )
+        } else {
+            if(lexer->current_char == '\0') break;
+        }
     }
 
     lexer->token.token_value[index] = '\0';
@@ -303,21 +307,12 @@ void get_token(NovaLexer *lexer) {
 
             advance_lexer(lexer);
 
-            /* Since this while loop keeps going until `=` is found, we find `\0` first throw an error. */
-            nova_assert(
-                lexer->current_char == '\0',
-                "\e[1;31mExpected `=` after variable declaration, \e[4;31mline %d.\e[0m\n",
-                {
-                    free(lexer->token.token_value);
-                    free(lexer);
-                },
-                lexer->line
-            )
-
             lexer->token.token_value = realloc(
                 lexer->token.token_value,
                 (variable_size + 1) * sizeof(*lexer->token.token_value)
             );
+
+            if(lexer->current_char == '\0') break;
         }
 
         lexer->token.token_value[variable_size] = '\0';
@@ -363,6 +358,7 @@ void get_token(NovaLexer *lexer) {
             },
             lexer->line
         )
+
         while(lexer->current_char != '\n' && lexer->current_char != '\0')
             advance_lexer(lexer);
 
@@ -394,11 +390,11 @@ void get_token(NovaLexer *lexer) {
     if(is_ascii(lexer->current_char)) {
         lexer->last_token = lexer->token;
 
-        get_keyword(lexer);
+        get_keyword(lexer, false);
 
         att(lexer, (uint8_t *)"print", PRINT_KW)
-        att(lexer, (uint8_t *)"get", GET_KW)
-        att(lexer, (uint8_t *)"post", POST_KW)
+        att(lexer, (uint8_t *)"GET", GET_KW)
+        att(lexer, (uint8_t *)"POST", POST_KW)
         att(lexer, (uint8_t *)"headers", HEADERS_KW)
         att(lexer, (uint8_t *)"endpoint", ENDPOINT_KW)
         att(lexer, (uint8_t *)"expected", EXPECTED_KW)
@@ -407,6 +403,23 @@ void get_token(NovaLexer *lexer) {
         att(lexer, (uint8_t *)"variable", VARIABLE_KW)
 
         /* If we get here, something went wrong. */
+        fprintf(stderr, "Unknown keyword: %s", lexer->token.token_value);
+        free(lexer->token.token_value);
+        free(lexer);
+        exit(EXIT_FAILURE);
+    }
+
+    if(lexer->current_char == '#') {
+        advance_lexer(lexer);
+
+        lexer->last_token = lexer->token;
+
+        /* Allow EOF, as #end could be the last thing in the source code. */
+        get_keyword(lexer, true);
+
+        att(lexer, (uint8_t *)"begin", BEGIN_KW)
+        att(lexer, (uint8_t *)"end", END_KW)
+
         fprintf(stderr, "Unknown keyword: %s", lexer->token.token_value);
         free(lexer->token.token_value);
         free(lexer);

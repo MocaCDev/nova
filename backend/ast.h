@@ -1,32 +1,17 @@
 #ifndef nova_ast
 #define nova_ast
 #include "../common.h"
+#include "endpoints.h"
 #include "lexer.h"
 
 /* Default base URL. */
 static uint8_t *base_url = (uint8_t *)"https://127.0.0.1:3000";
-
-/* Variables. */
-typedef enum {
-    STRING,
-    INTEGER
-} VariableType;
 
 typedef struct {
     VariableType variable_type;
     uint8_t *variable_name;
     void *variable_data;
 } Variable;
-
-static Variable *variables = NULL;
-static uint32_t variable_amount = 0;
-
-/* Logical actions to be performed in the code. */
-typedef enum {
-    PRINT,
-    POST, GET,
-    CHECk
-} LogicalActionTypes;
 
 /* Logical action `print`. */
 typedef struct {
@@ -56,10 +41,23 @@ typedef struct {
     } Action;
 } LogicalActions;
 
-static LogicalActions *logical_actions = NULL;
-static uint32_t number_of_actions = 0;
+/* Stores all critical data for the logical operations of the source code. */
+typedef struct {
+    /* Data over the endpoints. */
+    Endpoint *endpoints;
+    uint32_t total_endpoints;
+
+    /* Data over variables. */
+    Variable *variables;
+    uint32_t variable_amount;
+
+    /* Data over logical operations. */
+    LogicalActions *logical_actions;
+    uint32_t number_of_actions;
+} NovaAST;
 
 /* We need to pass the lexer to ensure it gets freed if an error ocurrs. */
+NovaAST *init_ast();
 void perform_logic(LogicalActions *actions, NovaLexer *lexer, uint32_t noa); // `noa` = number of actions
 
 #endif

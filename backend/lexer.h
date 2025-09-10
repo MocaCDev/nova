@@ -21,6 +21,7 @@ typedef enum { // `kw` = keyword
     POST_KW, GET_KW, HEADERS_KW, ENDPOINT_KW,
     EXPECTED_KW, OKAY_KW, REJECT_KW, // `expected`, `okay`, `reject`
     VARIABLE_KW, // `variable`,
+    BEGIN_KW, END_KW, // `#begin`, `#end`
     PRINT_KW,
     END_OF_FILE
 } NovaTokens;

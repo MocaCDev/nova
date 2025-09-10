@@ -2,7 +2,7 @@
 #include "ast.h"
 #include "lexer.h"
 
-void parse_variable_declaration(NovaLexer *lexer) {
+void parse_variable_declaration(NovaLexer *lexer, NovaAST *ast) {
     get_token(lexer);
 
     /* Most likely not needed, as the lexer handles most of this logic. */
@@ -44,12 +44,13 @@ void parse_variable_declaration(NovaLexer *lexer) {
     }
 
     uint8_t *var_name = lexer->token.token_value;
+    var_name[strlen((const char *)var_name) - 1] = '\0';
 
     /* If there are existing variables, ensure the variable name does not exist yet. */
-    if(variable_amount > 0) {
-        for(int i = 0; i < variable_amount; i++) {
+    if(ast->variable_amount > 0) {
+        for(int i = 0; i < ast->variable_amount; i++) {
             nova_assert(
-                (strcmp((char *)variables[i].variable_name, (const char *)var_name) == 0),
+                (strcmp((char *)ast->variables[i].variable_name, (const char *)var_name) == 0),
                 "\e[1;31mVariable \e[4;31m`%s`\e[0m\e[1;31m exists, \e[4;31mline %d.\e[0m\n",
                 {
                     free(lexer);
@@ -72,31 +73,31 @@ void parse_variable_declaration(NovaLexer *lexer) {
 
     VariableType variable_type = lexer->token.token_id == STRING_VALUE ? STRING : INTEGER;
 
-    if(!variables) {
-        variables = calloc(1, sizeof(*variables));
+    if(!ast->variables) {
+        ast->variables = calloc(1, sizeof(*ast->variables));
 
-        variables[0].variable_name = var_name;
-        variables[0].variable_data = lexer->token.token_value;
-        variables[0].variable_type = variable_type;
+        ast->variables[0].variable_name = var_name;
+        ast->variables[0].variable_data = lexer->token.token_value;
+        ast->variables[0].variable_type = variable_type;
 
-        variable_amount++;
+        ast->variable_amount++;
     } else {
-        variables = realloc(
-            variables,
-            (variable_amount + 1) * sizeof(*variables)
+        ast->variables = realloc(
+            ast->variables,
+            (ast->variable_amount + 1) * sizeof(*ast->variables)
         );
 
-        variables[variable_amount].variable_name = var_name;
-        variables[variable_amount].variable_data = lexer->token.token_value;
-        variables[variable_amount].variable_type = variable_type;
+        ast->variables[ast->variable_amount].variable_name = var_name;
+        ast->variables[ast->variable_amount].variable_data = lexer->token.token_value;
+        ast->variables[ast->variable_amount].variable_type = variable_type;
 
-        variable_amount++;
+        ast->variable_amount++;
     }
 
     get_token(lexer);
 }
 
-void parse_print_statement(NovaLexer *lexer) {
+void parse_print_statement(NovaLexer *lexer, NovaAST *ast) {
     get_token(lexer);
 
     nova_assert(
@@ -126,7 +127,7 @@ void parse_print_statement(NovaLexer *lexer) {
         )
 
         nova_assert(
-            !(variable_amount > 0),
+            !(ast->variable_amount > 0),
             "No variable declarations were found.\n",
             {
                 free(lexer->token.token_value);
@@ -135,68 +136,73 @@ void parse_print_statement(NovaLexer *lexer) {
             NULL
         )
 
-        for(int i = 0; i < variable_amount; i++) {
-            if(strcmp((const char *)variables[i].variable_name, (const char *)lexer->token.token_value) == 0) {
-                data_to_print = (void *)variables[i].variable_data;
-                data_type = variables[i].variable_type;
-                break;
-            }
+        if(strcmp((const char *)lexer->token.token_value, "base") == 0) {
+            data_to_print = (void *)base_url;
+            data_type = STRING;
+        } else {
+            for(int i = 0; i < ast->variable_amount; i++) {
+                if(strcmp((const char *)ast->variables[i].variable_name, (const char *)lexer->token.token_value) == 0) {
+                    data_to_print = (void *)ast->variables[i].variable_data;
+                    data_type = ast->variables[i].variable_type;
+                    break;
+                }
 
-            nova_assert(
-                i == variable_amount - 1,
-                "Variable %s not found, line %d.\n",
-                {
-                    free(lexer->token.token_value);
-                    free(lexer);
-                },
-                lexer->token.token_value, lexer->line - 1
-            )
+                nova_assert(
+                    i == ast->variable_amount - 1,
+                    "Variable %s not found, line %d.\n",
+                    {
+                        free(lexer->token.token_value);
+                        free(lexer);
+                    },
+                    lexer->token.token_value, lexer->line - 1
+                )
+            }
         }
     } else {
         data_to_print = (void *)lexer->token.token_value;
         data_type = lexer->token.token_id == STRING_VALUE ? STRING : INTEGER;
     }
 
-    if(!logical_actions) {
-        logical_actions = calloc(1, sizeof(*logical_actions));
+    if(!ast->logical_actions) {
+        ast->logical_actions = calloc(1, sizeof(*ast->logical_actions));
         
-        logical_actions[0].logical_action_type = PRINT;
+        ast->logical_actions[0].logical_action_type = PRINT;
         if(data_type == STRING) {
-            logical_actions[0].Action.print_action.variable_data.string_data = data_to_print;
-            logical_actions[0].Action.print_action.data_length = strlen((const char *)data_to_print);
+            ast->logical_actions[0].Action.print_action.variable_data.string_data = data_to_print;
+            ast->logical_actions[0].Action.print_action.data_length = strlen((const char *)data_to_print);
         } else {
-            logical_actions[0].Action.print_action.variable_data.number_data = atoi((const char *)data_to_print);
-            logical_actions[0].Action.print_action.data_length = sizeof(uint32_t);
+            ast->logical_actions[0].Action.print_action.variable_data.number_data = atoi((const char *)data_to_print);
+            ast->logical_actions[0].Action.print_action.data_length = sizeof(uint32_t);
         }
         
-        logical_actions[0].Action.print_action.data_type = data_type;
+        ast->logical_actions[0].Action.print_action.data_type = data_type;
 
-        number_of_actions++;
+        ast->number_of_actions++;
     } else {
-        logical_actions = realloc(
-            logical_actions,
-            (number_of_actions + 1) * sizeof(*logical_actions)
+        ast->logical_actions = realloc(
+            ast->logical_actions,
+            (ast->number_of_actions + 1) * sizeof(*ast->logical_actions)
         );
 
-        logical_actions[number_of_actions].logical_action_type = PRINT;
+        ast->logical_actions[ast->number_of_actions].logical_action_type = PRINT;
 
         if(data_type == STRING) {
-            logical_actions[number_of_actions].Action.print_action.variable_data.string_data = data_to_print;
-            logical_actions[number_of_actions].Action.print_action.data_length = strlen((const char *)data_to_print);
+            ast->logical_actions[ast->number_of_actions].Action.print_action.variable_data.string_data = data_to_print;
+            ast->logical_actions[ast->number_of_actions].Action.print_action.data_length = strlen((const char *)data_to_print);
         } else {
-            logical_actions[number_of_actions].Action.print_action.variable_data.number_data = atoi((const char *)data_to_print);
-            logical_actions[number_of_actions].Action.print_action.data_length = sizeof(uint32_t);
+            ast->logical_actions[ast->number_of_actions].Action.print_action.variable_data.number_data = atoi((const char *)data_to_print);
+            ast->logical_actions[ast->number_of_actions].Action.print_action.data_length = sizeof(uint32_t);
         }
 
-        logical_actions[number_of_actions].Action.print_action.data_type = data_type;
+        ast->logical_actions[ast->number_of_actions].Action.print_action.data_type = data_type;
 
-        number_of_actions++;
+        ast->number_of_actions++;
     }
 
     get_token(lexer);
 }
 
-void parse_expected_header(NovaLexer *lexer, uint8_t *endpoint) {
+void parse_expected_header(NovaLexer *lexer, NovaAST *ast, uint8_t *endpoint) {
     get_token(lexer); // `]`
 
     nova_assert(
@@ -261,7 +267,7 @@ void parse_expected_header(NovaLexer *lexer, uint8_t *endpoint) {
             lexer->line - 1
         )
 
-        endpoints[total_endpoints - 1].endpoint = endpoint;
+        ast->endpoints[ast->total_endpoints - 1].endpoint = endpoint;
 
         if(index == 0) {
             header_fields = calloc(1, sizeof(*header_fields));
@@ -281,15 +287,15 @@ void parse_expected_header(NovaLexer *lexer, uint8_t *endpoint) {
         get_token(lexer);
     }
 
-    endpoints[total_endpoints - 1].endpoint_expected_http_header = calloc(index, sizeof(HTTPHeader));
-    endpoints[total_endpoints - 1].expected_http_header_entries = index;
-    memcpy(endpoints[total_endpoints - 1].endpoint_expected_http_header, header_fields, sizeof(HTTPHeader) * index);
+    ast->endpoints[ast->total_endpoints - 1].endpoint_expected_http_header = calloc(index, sizeof(HTTPHeader));
+    ast->endpoints[ast->total_endpoints - 1].expected_http_header_entries = index;
+    memcpy(ast->endpoints[ast->total_endpoints - 1].endpoint_expected_http_header, header_fields, sizeof(HTTPHeader) * index);
     free(header_fields);
 
     get_token(lexer);
 }
 
-void parse_okay_header(NovaLexer *lexer, uint8_t *endpoint) {
+void parse_okay_header(NovaLexer *lexer, NovaAST *ast, uint8_t *endpoint) {
     get_token(lexer); // `]`
 
     nova_assert(
@@ -354,100 +360,7 @@ void parse_okay_header(NovaLexer *lexer, uint8_t *endpoint) {
             lexer->line - 1
         )
 
-        endpoints[total_endpoints - 1].endpoint = endpoint;
-
-        if(index == 0) {
-            header_fields = calloc(1, sizeof(*header_fields));
-            index++;
-        } else {
-            header_fields = realloc(
-                header_fields,
-                (index + 1) * sizeof(*header_fields)
-            );
-            index++;
-        }
-
-        header_fields[index - 1].key = key_value;
-        header_fields[index - 1].is_variable = lexer->token.token_id == VARIABLE_KW;
-        header_fields[index - 1].value = lexer->token.token_id == VARIABLE_KW ? NULL : lexer->token.token_value;
-        
-        get_token(lexer);
-    }
-
-    endpoints[total_endpoints - 1].endpoint_okay_http_header = calloc(index, sizeof(HTTPHeader));
-    endpoints[total_endpoints - 1].okay_http_header_entries = index;
-    memcpy(endpoints[total_endpoints - 1].endpoint_okay_http_header, header_fields, sizeof(HTTPHeader) * index);
-    free(header_fields);
-
-    get_token(lexer);
-}
-
-void parse_rejected_header(NovaLexer *lexer, uint8_t *endpoint) {
-    get_token(lexer); // `]`
-
-    nova_assert(
-        lexer->token.token_id != RIGHT_SB,
-        "Expected `]`, line %d.\n",
-        {
-            free(lexer->token.token_value);
-            free(lexer);
-        },
-        lexer->line - 1
-    )
-
-    get_token(lexer);
-
-    nova_assert(
-        lexer->token.token_id != LEFT_CB,
-        "Expected `{` following `[expected]`, line %d.\n",
-        {
-            free(lexer->token.token_value);
-            free(lexer);
-        },
-        lexer->line - 1
-    )
-
-    get_token(lexer);
-
-    HTTPHeader *header_fields = NULL;
-    uint32_t index = 0;
-
-    while(lexer->token.token_id != RIGHT_CB) {
-        nova_assert(
-            lexer->token.token_id != STRING_VALUE,
-            "Expected string, line %d.\n",
-            {
-                free(lexer->token.token_value);
-                free(lexer);
-            },
-            lexer->line - 1
-        )
-
-        uint8_t *key_value = lexer->token.token_value;
-
-        get_token(lexer);
-        nova_assert(
-            lexer->token.token_id != COLON,
-            "Expected colon, line %d.\n",
-            {
-                free(lexer->token.token_value);
-                free(lexer);
-            },
-            lexer->line - 1
-        )
-        get_token(lexer);
-
-        nova_assert(
-            lexer->token.token_id != STRING_VALUE && lexer->token.token_id != VARIABLE_KW,
-            "Expected string or `variable`, line %d.\n",
-            {
-                free(lexer->token.token_value);
-                free(lexer);
-            },
-            lexer->line - 1
-        )
-
-        endpoints[total_endpoints - 1].endpoint = endpoint;
+        ast->endpoints[ast->total_endpoints - 1].endpoint = endpoint;
 
         if(index == 0) {
             header_fields = calloc(1, sizeof(*header_fields));
@@ -467,15 +380,108 @@ void parse_rejected_header(NovaLexer *lexer, uint8_t *endpoint) {
         get_token(lexer);
     }
 
-    endpoints[total_endpoints - 1].endpoint_reject_http_header = calloc(index, sizeof(HTTPHeader));
-    endpoints[total_endpoints - 1].reject_http_header_entries = index;
-    memcpy(endpoints[total_endpoints - 1].endpoint_reject_http_header, header_fields, sizeof(HTTPHeader) * index);
+    ast->endpoints[ast->total_endpoints - 1].endpoint_okay_http_header = calloc(index, sizeof(HTTPHeader));
+    ast->endpoints[ast->total_endpoints - 1].okay_http_header_entries = index;
+    memcpy(ast->endpoints[ast->total_endpoints - 1].endpoint_okay_http_header, header_fields, sizeof(HTTPHeader) * index);
     free(header_fields);
 
     get_token(lexer);
 }
 
-void parse_headers_statement(NovaLexer *lexer, uint8_t *endpoint) {
+void parse_rejected_header(NovaLexer *lexer, NovaAST *ast, uint8_t *endpoint) {
+    get_token(lexer); // `]`
+
+    nova_assert(
+        lexer->token.token_id != RIGHT_SB,
+        "Expected `]`, line %d.\n",
+        {
+            free(lexer->token.token_value);
+            free(lexer);
+        },
+        lexer->line - 1
+    )
+
+    get_token(lexer);
+
+    nova_assert(
+        lexer->token.token_id != LEFT_CB,
+        "Expected `{` following `[expected]`, line %d.\n",
+        {
+            free(lexer->token.token_value);
+            free(lexer);
+        },
+        lexer->line - 1
+    )
+
+    get_token(lexer);
+
+    HTTPHeader *header_fields = NULL;
+    uint32_t index = 0;
+
+    while(lexer->token.token_id != RIGHT_CB) {
+        nova_assert(
+            lexer->token.token_id != STRING_VALUE,
+            "Expected string, line %d.\n",
+            {
+                free(lexer->token.token_value);
+                free(lexer);
+            },
+            lexer->line - 1
+        )
+
+        uint8_t *key_value = lexer->token.token_value;
+
+        get_token(lexer);
+        nova_assert(
+            lexer->token.token_id != COLON,
+            "Expected colon, line %d.\n",
+            {
+                free(lexer->token.token_value);
+                free(lexer);
+            },
+            lexer->line - 1
+        )
+        get_token(lexer);
+
+        nova_assert(
+            lexer->token.token_id != STRING_VALUE && lexer->token.token_id != VARIABLE_KW,
+            "Expected string or `variable`, line %d.\n",
+            {
+                free(lexer->token.token_value);
+                free(lexer);
+            },
+            lexer->line - 1
+        )
+
+        ast->endpoints[ast->total_endpoints - 1].endpoint = endpoint;
+
+        if(index == 0) {
+            header_fields = calloc(1, sizeof(*header_fields));
+            index++;
+        } else {
+            header_fields = realloc(
+                header_fields,
+                (index + 1) * sizeof(*header_fields)
+            );
+            index++;
+        }
+
+        header_fields[index - 1].key = key_value;
+        header_fields[index - 1].is_variable = lexer->token.token_id == VARIABLE_KW;
+        header_fields[index - 1].value = lexer->token.token_id == VARIABLE_KW ? NULL : lexer->token.token_value;
+        
+        get_token(lexer);
+    }
+
+    ast->endpoints[ast->total_endpoints - 1].endpoint_reject_http_header = calloc(index, sizeof(HTTPHeader));
+    ast->endpoints[ast->total_endpoints - 1].reject_http_header_entries = index;
+    memcpy(ast->endpoints[ast->total_endpoints - 1].endpoint_reject_http_header, header_fields, sizeof(HTTPHeader) * index);
+    free(header_fields);
+
+    get_token(lexer);
+}
+
+void parse_headers_statement(NovaLexer *lexer, NovaAST *ast, uint8_t *endpoint) {
     get_token(lexer);
 
     nova_assert(
@@ -506,9 +512,9 @@ void parse_headers_statement(NovaLexer *lexer, uint8_t *endpoint) {
                 )
 
                 switch(lexer->token.token_id) {
-                    case EXPECTED_KW: parse_expected_header(lexer, endpoint);break;
-                    case OKAY_KW: parse_okay_header(lexer, endpoint);break;
-                    case REJECT_KW: parse_rejected_header(lexer, endpoint);break;
+                    case EXPECTED_KW: parse_expected_header(lexer, ast, endpoint);break;
+                    case OKAY_KW: parse_okay_header(lexer, ast, endpoint);break;
+                    case REJECT_KW: parse_rejected_header(lexer, ast, endpoint);break;
                     default: {
                         fprintf(stderr, "Unexpected error.\n");
                         free(lexer->token.token_value);
@@ -531,7 +537,7 @@ void parse_headers_statement(NovaLexer *lexer, uint8_t *endpoint) {
     get_token(lexer);
 }
 
-void parse_endpoint_config(NovaLexer *lexer) {
+/*void parse_endpoint_config(NovaLexer *lexer) {
     get_token(lexer);
 
     nova_assert(
@@ -584,18 +590,18 @@ void parse_endpoint_config(NovaLexer *lexer) {
 
     get_token(lexer);
 
-    if(total_endpoints == 0)
+    if(ast->total_endpoints == 0)
     {
-        endpoints = calloc(1, sizeof(*endpoints));
-        endpoints[total_endpoints] = init_endpoint();
-        total_endpoints++;
+        ast->endpoints = calloc(1, sizeof(*ast->endpoints));
+        ast->endpoints[ast->total_endpoints] = init_endpoint();
+        ast->total_endpoints++;
     }
     else
     {
-        if(endpoints[total_endpoints - 1].endpoint != NULL) {
-            for(int i = 0; i < total_endpoints; i++)
+        if(ast->endpoints[ast->total_endpoints - 1].endpoint != NULL) {
+            for(int i = 0; i < ast->total_endpoints; i++)
                 nova_assert(
-                    strcmp((const char *)endpoints[i].endpoint, (const char *)endpoint) == 0,
+                    strcmp((const char *)ast->endpoints[i].endpoint, (const char *)endpoint) == 0,
                     "Endpoint `%s` has already been configured, line %d.\n",
                     {
                         free(lexer);
@@ -608,12 +614,12 @@ void parse_endpoint_config(NovaLexer *lexer) {
                     endpoint, lexer->line
                 )
             
-            endpoints = realloc(
-                endpoints,
-                (total_endpoints + 1) * sizeof(*endpoints)
+            ast->endpoints = realloc(
+                ast->endpoints,
+                (ast->total_endpoints + 1) * sizeof(*ast->endpoints)
             );
-            endpoints[total_endpoints] = init_endpoint();
-            total_endpoints++;
+            ast->endpoints[ast->total_endpoints] = init_endpoint();
+            ast->total_endpoints++;
         }
     }
 
@@ -630,60 +636,153 @@ void parse_endpoint_config(NovaLexer *lexer) {
         }
     }
 
-    for(int i = 0; i < total_endpoints; i++) {
-        printf("\nEndpoint:%s\n", endpoints[i].endpoint);
+    for(int i = 0; i < ast->total_endpoints; i++) {
+        printf("\nEndpoint:%s\n", ast->endpoints[i].endpoint);
 
-        if(endpoints[i].expected_http_header_entries > 0) {
+        if(ast->endpoints[i].expected_http_header_entries > 0) {
             printf("Expected HTTP Header Config:\n");
-            for(int x = 0; x < endpoints[i].expected_http_header_entries; x++) {
+            for(int x = 0; x < ast->endpoints[i].expected_http_header_entries; x++) {
                 printf(
                     "\tKey: %s\n"
                     "\tValue: %s\n\n",
-                    endpoints[i].endpoint_expected_http_header[x].key,
-                    endpoints[i].endpoint_expected_http_header[x].is_variable ? (uint8_t *)"variable" : (uint8_t *)endpoints[i].endpoint_expected_http_header[x].value
+                    ast->endpoints[i].endpoint_expected_http_header[x].key,
+                    ast->endpoints[i].endpoint_expected_http_header[x].is_variable ? (uint8_t *)"variable" : (uint8_t *)endpoints[i].endpoint_expected_http_header[x].value
                 );
             }
         }
 
-        if(endpoints[i].okay_http_header_entries > 0) {
+        if(ast->endpoints[i].okay_http_header_entries > 0) {
             printf("Okay HTTP Header Config:\n");
-            for(int x = 0; x < endpoints[i].okay_http_header_entries; x++) {
+            for(int x = 0; x < ast->endpoints[i].okay_http_header_entries; x++) {
                 printf(
                     "\tKey: %s\n"
                     "\tValue: %s\n\n",
-                    endpoints[i].endpoint_okay_http_header[x].key,
-                    endpoints[i].endpoint_okay_http_header[x].is_variable ? (uint8_t *)"variable" : (uint8_t *)endpoints[i].endpoint_expected_http_header[x].value
+                    ast->endpoints[i].endpoint_okay_http_header[x].key,
+                    ast->endpoints[i].endpoint_okay_http_header[x].is_variable ? (uint8_t *)"variable" : (uint8_t *)endpoints[i].endpoint_expected_http_header[x].value
                 );
             }
         }
 
-        if(endpoints[i].reject_http_header_entries > 0) {
+        if(ast->endpoints[i].reject_http_header_entries > 0) {
             printf("Reject HTTP Header Config:\n");
-            for(int x = 0; x < endpoints[i].reject_http_header_entries; x++) {
+            for(int x = 0; x < ast->endpoints[i].reject_http_header_entries; x++) {
                 printf(
                     "\tKey: %s\n"
                     "\tValue: %s\n\n",
-                    endpoints[i].endpoint_reject_http_header[x].key,
-                    endpoints[i].endpoint_reject_http_header[x].is_variable ? (uint8_t *)"variable" : (uint8_t *)endpoints[i].endpoint_expected_http_header[x].value
+                    ast->endpoints[i].endpoint_reject_http_header[x].key,
+                    ast->endpoints[i].endpoint_reject_http_header[x].is_variable ? (uint8_t *)"variable" : (uint8_t *)endpoints[i].endpoint_expected_http_header[x].value
                 );
             }
         }
     }
 
     get_token(lexer);
+}*/
+
+void parse_endpoint_configuration(NovaLexer *lexer, NovaAST *ast) {
+    get_token(lexer);
+
+    nova_assert(
+        lexer->token.token_id != GET_KW && lexer->token.token_id != POST_KW,
+        "Expected `GET` or `POST` in endpoint configuration, got `%s` line %d.\n",
+        {
+            free(lexer->token.token_value);
+            free(lexer);
+        },
+        lexer->token.token_value, lexer->line
+    )
+
+    LogicalActionTypes endpoint_type = lexer->token.token_id == GET_KW ? GET : POST;
+
+    get_token(lexer); // Should be the endpoint name
+
+    nova_assert(
+        lexer->token.token_id != STRING_VALUE,
+        "Expected string following `%s`, line %d.\n",
+        {
+            free(lexer->token.token_value);
+            free(lexer);
+        },
+        endpoint_type == GET ? "GET" : "POST", lexer->line
+    )
+
+    if(ast->total_endpoints == 0)
+    {
+        ast->endpoints = calloc(1, sizeof(*ast->endpoints));
+        ast->endpoints[ast->total_endpoints] = init_endpoint();
+        ast->total_endpoints++;
+    }
+    else
+    {
+        if(ast->endpoints[ast->total_endpoints - 1].endpoint != NULL) {
+            for(int i = 0; i < ast->total_endpoints; i++)
+                nova_assert(
+                    strcmp((const char *)ast->endpoints[i].endpoint, (const char *)lexer->token.token_value) == 0,
+                    "Endpoint `%s` has already been configured, line %d.\n",
+                    {
+                        free(lexer);
+                        
+                        if(ast->logical_actions)
+                            free(ast->logical_actions);
+
+                        free(ast->endpoints);
+                    },
+                    lexer->token.token_value, lexer->line
+                )
+            
+            ast->endpoints = realloc(
+                ast->endpoints,
+                (ast->total_endpoints + 1) * sizeof(*ast->endpoints)
+            );
+            ast->endpoints[ast->total_endpoints] = init_endpoint();
+            ast->total_endpoints++;
+        }
+    }
+
+    uint8_t *endpoint = lexer->token.token_value;
+    ast->endpoints[ast->total_endpoints - 1].endpoint_type = endpoint_type;
+
+    get_token(lexer);
+
+    while(lexer->token.token_id != END_KW) {
+        switch(lexer->token.token_id) {
+            case HEADERS_KW: parse_headers_statement(lexer, ast, endpoint);break;
+            default: {
+                fprintf(stderr, "Expected `headers`, line %d.\n", lexer->line);
+                free(lexer->token.token_value);
+                free(lexer);
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+
+    nova_assert(
+        ast->endpoints[ast->total_endpoints - 1].endpoint == NULL,
+        "Incomplete endpoint configuration. There needs to be a configuration for one of the following:\n\t1. Headers\n\t2. Body\n\t3. Both\nLine %d.\n",
+        {
+            free(lexer->token.token_value);
+            free(lexer);
+        },
+        lexer->line
+    )
+
+    get_token(lexer);
 }
 
 void start_parsing(const char *filename) {
     NovaLexer *lexer = init_lexer(filename);
+    NovaAST *ast = init_ast();
+
     printf("Lexer initialized.\n");
 
     get_token(lexer);
 
     while(lexer->token.token_id != END_OF_FILE) {
         switch(lexer->token.token_id) {
-            case AT_SYMBOL: parse_variable_declaration(lexer);break;
-            case PRINT_KW: parse_print_statement(lexer);break;
-            case ENDPOINT_KW: parse_endpoint_config(lexer);break;
+            case AT_SYMBOL: parse_variable_declaration(lexer, ast);break;
+            case PRINT_KW: parse_print_statement(lexer, ast);break;
+            case BEGIN_KW: parse_endpoint_configuration(lexer, ast);break;
+            //case ENDPOINT_KW: parse_endpoint_config(lexer);break;
             default: {
                 fprintf(stderr, "\e[1;31mAn unknown error ocurred\e[0m.\n");
                 free(lexer);
@@ -692,17 +791,60 @@ void start_parsing(const char *filename) {
         }
     }
 
-    perform_logic(logical_actions, lexer, number_of_actions);
+    for(int i = 0; i < ast->total_endpoints; i++) {
+        printf("\nEndpoint:%s\nRequest Type: %s\n",
+            ast->endpoints[i].endpoint,
+            ast->endpoints[i].endpoint_type == GET ? "GET" : "POST"
+        );
+
+        if(ast->endpoints[i].expected_http_header_entries > 0) {
+            printf("Expected HTTP Header Config:\n");
+            for(int x = 0; x < ast->endpoints[i].expected_http_header_entries; x++) {
+                printf(
+                    "\tKey: %s\n"
+                    "\tValue: %s\n\n",
+                    ast->endpoints[i].endpoint_expected_http_header[x].key,
+                    ast->endpoints[i].endpoint_expected_http_header[x].is_variable ? (uint8_t *)"variable" : (uint8_t *)ast->endpoints[i].endpoint_expected_http_header[x].value
+                );
+            }
+        }
+
+        if(ast->endpoints[i].okay_http_header_entries > 0) {
+            printf("Okay HTTP Header Config:\n");
+            for(int x = 0; x < ast->endpoints[i].okay_http_header_entries; x++) {
+                printf(
+                    "\tKey: %s\n"
+                    "\tValue: %s\n\n",
+                    ast->endpoints[i].endpoint_okay_http_header[x].key,
+                    ast->endpoints[i].endpoint_okay_http_header[x].is_variable ? (uint8_t *)"variable" : (uint8_t *)ast->endpoints[i].endpoint_expected_http_header[x].value
+                );
+            }
+        }
+
+        if(ast->endpoints[i].reject_http_header_entries > 0) {
+            printf("Reject HTTP Header Config:\n");
+            for(int x = 0; x < ast->endpoints[i].reject_http_header_entries; x++) {
+                printf(
+                    "\tKey: %s\n"
+                    "\tValue: %s\n\n",
+                    ast->endpoints[i].endpoint_reject_http_header[x].key,
+                    ast->endpoints[i].endpoint_reject_http_header[x].is_variable ? (uint8_t *)"variable" : (uint8_t *)ast->endpoints[i].endpoint_expected_http_header[x].value
+                );
+            }
+        }
+    }
+
+    perform_logic(ast->logical_actions, lexer, ast->number_of_actions);
 
     free(lexer);
 
-    if(endpoints)
+    if(ast->endpoints)
     {
-        free(endpoints);
+        free(ast->endpoints);
     }
 
-    if(logical_actions)
-        free(logical_actions);
+    if(ast->logical_actions)
+        free(ast->logical_actions);
 
     printf("Lexer released.\n");
 }

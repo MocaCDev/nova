@@ -22,4 +22,19 @@
 #define is_number(ch)               \
     ch >= 0x30 && ch <= 0x39
 
+/* Common enums and structs shared in multiple files. */
+
+/* Variables. */
+typedef enum {
+    STRING,
+    INTEGER
+} VariableType;
+
+/* Logical actions to be performed in the code. */
+typedef enum {
+    PRINT,
+    POST, GET,
+    CHECk
+} LogicalActionTypes;
+
 #endif

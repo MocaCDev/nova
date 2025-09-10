@@ -2,51 +2,67 @@
 // perform tasks.
 // Created: 09/06/2025, by Aidan White.
 
-@a_variable="\nyes\n\n"
+@a_variable = "\nyes\n\n"
+@base = "http://127.0.0.1:8080"
 
-endpoint("/test") {
-    headers {
-        [expected]
-        {
-            "test": "test"
-            "test2": "test2"
-        }
+#begin // Signifies the beginning of a endpoint configuration
 
-        [okay]
-        {
-            "test": "test"
-            "test2": "test2"
-        }
+// Inside of a endpoint configuration, you can only have `GET` or `POST`
+// followed by their respective configuration `headers` and `body`.
 
-        [reject]
-        {
-            "test": "test"
-            "test2": "test2"
-        }
+// Will append "/test" to @base
+GET "/test"
+headers {
+    // `[expected]` is the "best case scenario" for any given request.
+    // This is what we would like to see in the request.
+    [expected]
+    {
+        "Accept": "application/json"
+        "Content-Type": "application/json"
+    }
+
+    // `[okay]` tells Nova to not reject a request if it doesn't meet `[expected]`.
+    [okay]
+    {
+        "Content-Type": "application/json"
+    }
+
+    // Any request that does not adhere to `[expected]` or `[okay]` will be rejected.
+    // `[reject]` simply tells Nova that, even if the header adheres to `[expected]` or `[okay]`,
+    // if it has any of the given information reject it.
+    // In this instance, if the header does, in fact, adhere to `[expected]` or `[okay]`
+    // but has "API_KEY" in the header, it will be rejected.
+    [reject]
+    {
+        "API_KEY": variable
     }
 }
 
-endpoint("/test2") {
-    headers {
-        [expected]
-        {
-            "test": "test"
-            "test2": "test2"
-            "test3": variable
-        }
+#end // signifies the end of a endpoint configuration
 
-        [okay]
-        {
-            "test": "test"
-            "test2": "test2"
-            "test3": variable
-        }
+print @a_variable
 
-        [reject]
-        {
-            "test": "test"
-            "test2": "test2"
-            "test3": variable
-        }
+#begin
+
+GET "/test2"
+headers {
+    // In this instance, the request needs to adhere to the `[expected]` header.
+    // There is no `[okay]` header.
+    // If "Content-Type" is not "text", request will be rejected.
+    // If "Accept" is not "application/json", request will be rejected.
+    [expected]
+    {
+        "Content-Type": "text"
+        "Accept": "application/json"
+    }
+
+    // Upon `[expected]` being met, if we find "API_KEY" in the header reject the request.
+    [reject]
+    {
+        "API_KEY": variable
     }
 }
+
+#end
+
+print @a_variable
